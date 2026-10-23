@@ -1,0 +1,14 @@
+{
+ "project": "Greenhouse Demo",
+ "question": "What makes plants grow?",
+ "intro": "A three-run toy project used to test the analysis-map skill.",
+ "centre_label": "GROW",
+ "repo_root": "../..",
+ "catalogue": "docs/run-catalogue.md",
+ "notebooks_glob": "notebooks/*.ipynb",
+ "figure_dirs": [
+  "docs/figures"
+ ],
+ "data_dir": "docs/analysis-map",
+ "build_dir": "build"
+}

@@ -1,0 +1,504 @@
+<title>__PAGE_TITLE__</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one full-bleed night-sky canvas. Centre = the question; rings = goals → approach groups → runs. Floating glass card for detail, tour bar at the bottom. Deliberately single dark theme. */
+:root {
+  --sky0: #0d0910; --sky1: #1d1020; --fg: #f3ecf4; --muted: #a99cad; --faint: #6d6072; --glass: rgba(29, 18, 33, 0.82); --edge: rgba(231, 169, 207, 0.22);
+  --plum: #e7a9cf; --coral: #f08a78;
+  --s-supported: #5cc08c; --s-partly: #e0a84a; --s-not: #9b92a0; --s-method: #79a6dc; --s-failed: #ee6b5f; --s-audit: #b28be0; --s-infra: #7d7480;
+  --font: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+[hidden] { display: none !important; }
+body { background: var(--sky0); color: var(--fg); font-family: var(--font); font-size: 14px; overflow: hidden; }
+.sky { position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 45%, var(--sky1) 0%, var(--sky0) 70%); }
+svg#map { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; }
+svg#map:active { cursor: grabbing; }
+.top { position: fixed; top: 0; left: 0; right: 0; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-start; z-index: 5;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px)); padding-bottom: 8px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: linear-gradient(var(--sky0), rgba(13, 9, 16, 0)); pointer-events: none; }
+.top > * { pointer-events: auto; }
+h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.crumbs { font-size: 12.5px; color: var(--muted); margin-top: 4px; min-height: 1.2em; }
+.crumbs button { all: unset; cursor: pointer; color: var(--plum); }
+.crumbs button:focus-visible { outline: 2px solid var(--coral); }
+.tools { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; max-width: 100%; }
+input[type=search] { font: inherit; padding: 7px 11px; border: 1px solid var(--edge); border-radius: 8px; background: rgba(13, 9, 16, 0.7); color: var(--fg); width: 220px; max-width: 100%; }
+button.b { font: inherit; font-size: 12.5px; padding: 7px 11px; border: 1px solid var(--edge); border-radius: 8px; background: rgba(13, 9, 16, 0.7); color: var(--fg); cursor: pointer; }
+button.b:hover { border-color: var(--plum); }
+button.b.primary { background: var(--plum); color: #2a0b1f; border-color: var(--plum); font-weight: 700; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--coral); outline-offset: 1px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; justify-content: flex-end; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 11.5px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--edge); background: rgba(13, 9, 16, 0.7); color: var(--fg); cursor: pointer; }
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; }
+.chip[aria-pressed="false"] { opacity: 0.35; }
+.chip.solo { border-color: var(--fg); box-shadow: 0 0 0 1px var(--fg) inset; }
+.chip.reset { border-style: dashed; color: var(--plum); }
+.node.run.dim { opacity: 0.05; }
+.chip .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+.card { position: fixed; z-index: 6; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  width: 380px; max-width: calc(100vw - 32px); max-height: min(62vh, 560px); overflow-y: auto;
+  background: var(--glass); border: 1px solid var(--edge); border-radius: 14px; padding: 16px 18px 18px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); }
+.card .eyebrow { font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.card h2 { font-size: 17px; line-height: 1.3; margin: 4px 0 8px; text-wrap: balance; }
+.card p { line-height: 1.5; margin: 6px 0 10px; color: #e3d9e5; }
+.answer { border-left: 3px solid var(--plum); padding: 4px 0 4px 12px; line-height: 1.5; margin: 10px 0; }
+dl { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 7px 10px; margin: 12px 0 6px; }
+dt { color: var(--muted); font-size: 12px; padding-top: 1px; }
+dd { margin: 0; line-height: 1.45; }
+.pill { display: inline-block; font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; color: #16101a; }
+.sec { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.bar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; margin: 10px 0 4px; background: #3a3040; }
+.mini { font-size: 12px; color: var(--muted); }
+.list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 1px; }
+.list button { all: unset; box-sizing: border-box; width: 100%; cursor: pointer; padding: 5px 6px; border-radius: 6px; display: grid; grid-template-columns: 10px 40px minmax(0, 1fr); gap: 6px; align-items: baseline; }
+.list button:hover, .list button:focus-visible { background: rgba(231, 169, 207, 0.12); }
+.list .dot { width: 8px; height: 8px; border-radius: 50%; align-self: center; }
+.tour { position: fixed; z-index: 6; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  display: flex; gap: 8px; align-items: center; background: var(--glass); border: 1px solid var(--edge); border-radius: 999px; padding: 6px 8px;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); max-width: calc(100vw - 32px); }
+.tour .step { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 64px; text-align: center; }
+.tip { position: fixed; z-index: 7; pointer-events: none; max-width: 300px; background: var(--glass); border: 1px solid var(--edge); border-radius: 10px; padding: 8px 10px; font-size: 12.5px; line-height: 1.4; backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.tip b { display: block; margin-bottom: 2px; }
+/* map */
+.link { fill: none; stroke-opacity: 0.32; transition: stroke-opacity 0.4s, stroke-width 0.4s; }
+.link.on { stroke-opacity: 0.9; stroke-width: 2.4; }
+.node.down circle { filter: url(#glow); }
+.node.down.group text, .node.down.goal text { fill: #fff; }
+.node { cursor: pointer; transition: opacity 0.45s; }
+.node text { font-family: var(--font); fill: var(--fg); }
+.node.goal text { font-weight: 700; font-size: 21px; paint-order: stroke; stroke: var(--sky0); stroke-width: 4px; }
+.node.group text { font-size: 14px; fill: #dcd0de; paint-order: stroke; stroke: var(--sky0); stroke-width: 3px; }
+.node.run text { font-size: 12px; fill: #d6cbd8; opacity: 0; transition: opacity 0.35s; }
+svg.near .node.run text, .node.run.lit text, svg.focus .node.run.infocus text { opacity: 1; }
+.node.dim { opacity: 0.12; }
+.node.run.hit circle { stroke: var(--coral); stroke-width: 2; }
+.glow { filter: url(#glow); }
+.twinkle { animation: tw 4s ease-in-out infinite; }
+@keyframes tw { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+.centre text { font-weight: 700; fill: var(--fg); }
+
+/* reader */
+.reader { position: fixed; inset: 0; z-index: 20; background: rgba(9, 6, 11, 0.94); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); overflow-y: auto; }
+.rd-wrap { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 36px;
+  padding-top: calc(22px + env(safe-area-inset-top, 0px)); padding-bottom: 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.rd-bar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.rd-bar .grow { flex: 1; }
+.rd-toc { position: sticky; top: 24px; align-self: start; display: grid; gap: 2px; font-size: 13px; }
+.rd-toc a { color: var(--muted); text-decoration: none; padding: 5px 8px; border-radius: 6px; border-left: 2px solid transparent; }
+.rd-toc a:hover, .rd-toc a:focus-visible { color: var(--fg); background: rgba(231,169,207,0.08); border-left-color: var(--plum); outline: none; }
+.rd-main { min-width: 0; }
+.rd-main header .eyebrow { font-size: 11.5px; letter-spacing: 0.07em; text-transform: uppercase; }
+.rd-main h1 { font-size: clamp(22px, 3vw, 30px); line-height: 1.2; margin: 6px 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+.rd-key { font-size: 15.5px; line-height: 1.55; color: #eadfeb; border-left: 3px solid var(--plum); padding: 2px 0 2px 14px; margin: 14px 0 6px; max-width: 75ch; }
+.rd-sec { margin-top: 34px; scroll-margin-top: 20px; }
+.rd-sec > h2 { font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--plum); margin: 0 0 10px; display: flex; gap: 10px; align-items: baseline; }
+.rd-sec > h2 small { color: var(--muted); letter-spacing: 0; text-transform: none; font-size: 12.5px; font-weight: 400; }
+.md { line-height: 1.6; color: #e6dce8; max-width: 80ch; font-size: 14.5px; }
+.md p { margin: 0 0 12px; }
+.md ul, .md ol { margin: 0 0 12px; padding-left: 22px; }
+.md li { margin: 3px 0; }
+.md strong { color: #fff; }
+.md code { font-family: var(--mono); font-size: 12.5px; background: rgba(231,169,207,0.1); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+.md del { color: var(--muted); }
+.md a.sec-link { color: var(--plum); text-decoration: none; border-bottom: 1px dotted var(--plum); cursor: pointer; }
+.tbl { overflow-x: auto; margin: 6px 0 14px; max-width: 100%; }
+.plain { background: rgba(231,169,207,0.06); border: 1px solid var(--edge); border-radius: 12px; padding: 14px 16px 4px; margin: 0 0 16px; max-width: 82ch; }
+.plain .lab { font-size: 11.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--plum); margin-bottom: 6px; }
+.subhead { font-size: 11.5px; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); margin: 14px 0 8px; }
+.md table { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.md th, .md td { border-bottom: 1px solid #3a3040; padding: 6px 10px; text-align: left; vertical-align: top; }
+.md th { color: var(--muted); font-weight: 500; }
+.pipe { display: grid; grid-template-columns: 130px minmax(0, 1fr); border: 1px solid var(--edge); border-radius: 10px; overflow: hidden; max-width: 90ch; margin-bottom: 16px; }
+.pipe div { padding: 8px 12px; border-bottom: 1px solid rgba(231,169,207,0.1); line-height: 1.45; font-size: 13.5px; }
+.pipe .k { color: var(--muted); background: rgba(231,169,207,0.05); font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; }
+.pipe .step { color: var(--plum); font-family: var(--mono); margin-right: 6px; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; margin-top: 8px; }
+.fig { margin: 0; background: #fff; border-radius: 10px; overflow: hidden; cursor: zoom-in; border: 1px solid #3a3040; display: flex; flex-direction: column; }
+.fig img { width: 100%; height: 190px; object-fit: contain; background: #fff; display: block; }
+.fig figcaption { background: #1d1420; color: #ddd2df; font-size: 12.5px; padding: 9px 11px 10px; line-height: 1.45; overflow-wrap: anywhere; flex: 1; }
+.fig figcaption .leg p { margin: 0 0 4px; }
+.fig figcaption .leg { display: -webkit-box; -webkit-line-clamp: 6; -webkit-box-orient: vertical; overflow: hidden; }
+.fig figcaption .src { color: var(--muted); font-size: 11px; margin-top: 6px; }
+.gallery { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important; }
+.lb-leg { max-width: 900px; margin: 0 auto; text-align: left; color: #e6dce8; font-size: 13.5px; line-height: 1.5; padding: 0 16px; }
+.lb-leg p { margin: 0 0 6px; }
+.fig:focus-visible { outline: 2px solid var(--coral); }
+.lightbox { position: fixed; inset: 0; z-index: 30; background: rgba(5, 3, 6, 0.96); display: grid; grid-template-rows: minmax(0, 1fr) auto auto; }
+.lightbox img { max-width: calc(100vw - 32px); max-height: 100%; margin: auto; background: #fff; border-radius: 8px; object-fit: contain; align-self: center; justify-self: center; }
+.lb-bar { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px)); color: var(--muted); font-size: 12.5px; text-align: center; }
+.lb-imgwrap { min-height: 0; display: grid; padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 0; }
+.empty { color: var(--muted); font-style: italic; }
+@media (max-width: 820px) { .rd-wrap { grid-template-columns: minmax(0, 1fr); gap: 16px; } .rd-toc { position: static; display: flex; flex-wrap: wrap; } .pipe { grid-template-columns: 1fr; } .pipe .k { border-bottom: 0; padding-bottom: 2px; } }
+
+@media (max-width: 720px) {
+  .card { left: max(12px, env(safe-area-inset-left, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); width: auto; max-height: 40vh; bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
+  .tools { margin-left: 0; justify-content: flex-start; }
+  .chips { justify-content: flex-start; }
+  input[type=search] { width: 160px; }
+}
+@media (prefers-reduced-motion: reduce) { .twinkle { animation: none; } * { transition: none !important; } }
+</style>
+
+<div class="sky"></div>
+<svg id="map" role="img" aria-label="Radial map of analysis goals, approach groups and runs">
+  <defs>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+</svg>
+<div class="top">
+  <div>
+    <h1 id="mapTitle"></h1>
+    <div class="sub" id="mapSub"></div>
+    <div class="crumbs" id="crumbs"></div>
+  </div>
+  <div class="tools">
+    <input id="q" type="search" aria-label="Search runs" placeholder="Search runs, methods, results…" autocomplete="off">
+    <button class="b primary" id="tourBtn" type="button">Take the tour</button>
+    <button class="b" id="home" type="button">Overview</button>
+    <div class="chips" id="chips" role="group" aria-label="Filter by status"></div>
+  </div>
+</div>
+<div class="card" id="card" aria-live="polite"></div>
+<div class="tour" id="tour" hidden>
+  <button class="b" id="prev" type="button" aria-label="Previous stop">← Back</button>
+  <span class="step" id="step"></span>
+  <button class="b primary" id="next" type="button" aria-label="Next stop">Next →</button>
+  <button class="b" id="endTour" type="button">End tour</button>
+</div>
+<div class="tip" id="tip" hidden></div>
+<div class="reader" id="reader" hidden role="dialog" aria-modal="true" aria-label="Run notes"></div>
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="Figure">
+  <div class="lb-imgwrap"><img id="lbImg" alt=""></div>
+  <div class="lb-leg" id="lbLeg"></div>
+  <div class="lb-bar"><button class="b" id="lbPrev" type="button">← Prev</button><span id="lbCap"></span><button class="b" id="lbNext" type="button">Next →</button><button class="b" id="lbClose" type="button">Close</button></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+<script>
+const DATA = __DATA__;
+const NOTES = __NOTES__;
+const CONFIG = __CONFIG__;
+const STATUS = CONFIG.statuses || [["Supported", "--s-supported"], ["Partly supported", "--s-partly"], ["Not supported", "--s-not"],
+  ["Method negative (simple baseline wins)", "--s-method"], ["Declared prediction failed", "--s-failed"], ["Correction/audit", "--s-audit"], ["Infrastructure", "--s-infra"]];
+const SHORT = {"Method negative (simple baseline wins)": "Simple baseline wins"};
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const colorOf = s => { const c = (STATUS.find(x => x[0] === s) || [0, "--s-infra"])[1]; return c.startsWith("#") ? c : css(c); };
+// goals are drawn clockwise in the order goals.json lists them; colours cycle through a palette tuned for the dark sky
+const GOAL_ORDER = DATA.goals.map(g => g.id);
+const PALETTE = ["#e7a9cf", "#f08a78", "#f2c46d", "#8fd3b6", "#7fb7e8", "#b39ddb", "#e8a56b", "#9fc5c0", "#d8a0e0", "#a8d47f", "#f0b8a0", "#88c8e8"];
+const HUES = Object.fromEntries(GOAL_ORDER.map((g, i) => [g, DATA.goals[i].color || PALETTE[i % PALETTE.length]]));
+document.getElementById("mapTitle").textContent = CONFIG.question;
+document.getElementById("mapSub").textContent = `${CONFIG.project} · ${DATA.runs.length} runs · ${DATA.goals.length} goals · double-click a run for its full notes`;
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const active = new Set(STATUS.map(s => s[0]));
+let query = "", focusId = null, litId = null;
+
+// hierarchy
+const goalsById = Object.fromEntries(DATA.goals.map(g => [g.id, g]));
+const tree = {id: "root", type: "root", label: CONFIG.question, children: GOAL_ORDER.map(gid => {
+  const g = goalsById[gid];
+  return {...g, type: "goal", children: g.groups.map((name, i) => ({id: gid + "-" + i, type: "group", label: name, goalId: gid,
+    children: DATA.runs.filter(r => r.group === name).map(r => ({...r, id: "r" + r.section, type: "run", goalId: gid, label: `§${r.section} ${r.short_title}`}))}))};
+})};
+const R = 480, RING = {0: 0, 1: 0.32 * R, 2: 0.64 * R, 3: R};
+const h = d3.hierarchy(tree);
+// sectors: each goal gets an angle proportional to its run count, with a floor so small goals keep room
+const GAP = 0.05, goalW = g => Math.max(g.leaves().length, 11), groupW = g => Math.max(g.leaves().length, 4);
+const totalW = d3.sum(h.children, goalW), avail = 2 * Math.PI - GAP * h.children.length;
+let a0 = GAP / 2;
+h.x = 0;
+h.children.forEach(g => {
+  const span = avail * goalW(g) / totalW; g.x = a0 + span / 2;
+  const gw = d3.sum(g.children, groupW); let b0 = a0;
+  g.children.forEach(gr => {
+    const gs = span * groupW(gr) / gw; gr.x = b0 + gs / 2;
+    gr.children.forEach((r, i) => { r.x = b0 + (i + 0.5) * gs / gr.children.length; });
+    b0 += gs;
+  });
+  a0 += span + GAP;
+});
+h.each(d => { d.r = RING[d.depth]; d.cx = d.r * Math.cos(d.x - Math.PI / 2); d.cy = d.r * Math.sin(d.x - Math.PI / 2); });
+const byId = new Map(h.descendants().map(d => [d.data.id, d]));
+const goalOf = d => d.data.goalId || (d.data.type === "goal" ? d.data.id : null);
+const hue = d => HUES[goalOf(d)] || css("--plum");
+
+const svg = d3.select("#map"), world = svg.append("g");
+const gRings = world.append("g"), gLinks = world.append("g"), gNodes = world.append("g");
+[RING[1], RING[2], RING[3]].forEach(r => gRings.append("circle").attr("r", r).attr("fill", "none").attr("stroke", "rgba(231,169,207,0.07)").attr("stroke-dasharray", "2 6"));
+
+const zoom = d3.zoom().scaleExtent([0.3, 4]).on("zoom", e => { world.attr("transform", e.transform); svg.classed("near", e.transform.k > 1.7); });
+svg.call(zoom).on("dblclick.zoom", null);
+svg.on("click", e => { if (e.target === svg.node()) goHome(); });
+
+const radial = d3.linkRadial().angle(d => d.x).radius(d => d.r);
+const links = gLinks.selectAll("path").data(h.links()).join("path").attr("class", "link")
+  .attr("d", radial).attr("stroke", d => hue(d.target)).attr("stroke-width", d => d.target.depth === 1 ? 2 : d.target.depth === 2 ? 1.4 : 0.9);
+
+const nodes = gNodes.selectAll("g").data(h.descendants()).join("g")
+  .attr("class", d => "node " + d.data.type + (d.depth === 0 ? " centre" : ""))
+  .attr("transform", d => `translate(${d.cx},${d.cy})`).attr("tabindex", 0).attr("role", "button").attr("aria-label", d => d.data.label)
+  .on("click", (e, d) => { e.stopPropagation(); select(d); })
+  .on("dblclick", (e, d) => { e.stopPropagation(); if (d.depth === 3) openNotes(d.data.section); })
+  .on("keydown", (e, d) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(d); } })
+  .on("mouseenter", (e, d) => showTip(e, d)).on("mousemove", e => moveTip(e)).on("mouseleave", hideTip);
+
+nodes.append("circle")
+  .attr("r", d => d.depth === 0 ? 34 : d.depth === 1 ? 16 + Math.sqrt(d.leaves().length) * 2 : d.depth === 2 ? 8 : 6)
+  .attr("fill", d => d.depth === 0 ? "#2a1430" : d.depth === 3 ? colorOf(d.data.status) : d.depth === 2 ? css("--sky0") : hue(d))
+  .attr("stroke", d => d.depth === 0 ? css("--plum") : d.depth === 2 ? hue(d) : "none").attr("stroke-width", d => d.depth === 2 ? 2 : 1.5)
+  .attr("class", d => (d.depth === 1 || d.depth === 0 ? "glow" : "") + (d.depth === 3 && !reduce ? " twinkle" : ""))
+  .style("animation-delay", d => d.depth === 3 ? `${(d.data.section * 0.37) % 4}s` : null);
+
+// labels
+nodes.filter(d => d.depth === 0).append("text").attr("text-anchor", "middle").attr("dy", "0.35em").attr("font-size", 16).text(CONFIG.centre_label);
+nodes.filter(d => d.depth === 1).append("text")
+  .attr("text-anchor", d => { const s = Math.sin(d.x); return Math.abs(s) < 0.25 ? "middle" : s > 0 ? "start" : "end"; })
+  .attr("x", d => 34 * Math.sin(d.x)).attr("y", d => -34 * Math.cos(d.x)).attr("dy", d => Math.abs(Math.sin(d.x)) < 0.25 ? (Math.cos(d.x) > 0 ? "-0.2em" : "0.9em") : "0.35em")
+  .text(d => d.data.label);
+const radialText = sel => sel.append("text")
+  .attr("dy", "0.32em")
+  .attr("transform", d => { const a = d.x * 180 / Math.PI - 90, flip = d.x > Math.PI; return `rotate(${a}) translate(${d.depth === 3 ? 9 : 11},0)` + (flip ? " rotate(180)" : ""); })
+  .attr("text-anchor", d => d.x > Math.PI ? "end" : "start");
+// group/run text sits in the node group, so undo the node translate by rotating around the node itself
+radialText(nodes.filter(d => d.depth === 2)).text(d => d.data.label.replace(/ \(.*\)$/, ""));
+radialText(nodes.filter(d => d.depth === 3)).text(d => { const t = d.data.label; return t.length > 58 ? t.slice(0, 56) + "…" : t; });
+
+function matches(r) {
+  if (!active.has(r.status)) return false;
+  if (!query) return true;
+  const hay = [r.section, r.short_title, r.method, r.unit, r.validation, r.data, r.key_result, r.status].join(" ").toLowerCase();
+  return query.split(/\s+/).every(t => hay.includes(t));
+}
+function inFocus(d) { if (!focusId) return true; const f = byId.get(focusId); return d === f || d.ancestors().includes(f) || f.ancestors().includes(d); }
+function refresh() {
+  const lit = litId ? new Set(byId.get(litId).ancestors()) : null;
+  nodes.classed("infocus", d => focusId && inFocus(d))
+    .classed("dim", d => {
+      if (d.depth === 0) return false;
+      const leaves = d.depth === 3 ? [d] : d.leaves();
+      const anyMatch = leaves.some(l => matches(l.data));
+      return !anyMatch || !inFocus(d);
+    })
+    .classed("hit", d => d.depth === 3 && query && matches(d.data))
+    .classed("lit", d => lit && lit.has(d));
+  const f = focusId ? byId.get(focusId) : null;
+  const down = f ? new Set([...f.descendants(), ...f.ancestors()]) : null;
+  nodes.classed("down", d => !!down && down.has(d) && d.depth > 0);
+  links.classed("on", l => (lit && lit.has(l.target)) || (!lit && down && down.has(l.target)))
+    .attr("stroke-opacity", l => (!inFocus(l.target) || !(l.target.depth === 3 ? matches(l.target.data) : l.target.leaves().some(x => matches(x.data)))) ? 0.05 : null);
+  svg.classed("focus", !!focusId);
+  crumbs();
+}
+function flyTo(list, pad = 60, dur = reduce ? 0 : 900) {
+  const xs = list.map(d => d.cx), ys = list.map(d => d.cy);
+  const overview = list.length > 100, extra = overview ? 70 : list.some(d => d.depth === 3) ? 290 : 160;
+  const x0 = Math.min(...xs) - extra, x1 = Math.max(...xs) + extra, y0 = Math.min(...ys) - extra, y1 = Math.max(...ys) + extra;
+  const w = innerWidth, hgt = innerHeight, cardW = innerWidth > 720 ? 400 : 0, top = innerWidth > 720 ? 160 : 190, bottom = innerWidth > 720 ? 70 : innerHeight * 0.45;
+  const aw = w - cardW - pad, ah = hgt - top - bottom - pad;
+  const k = Math.max(0.3, Math.min(3.2, aw / (x1 - x0), ah / (y1 - y0)));
+  const cx = (w - cardW) / 2, cy = top + (hgt - top - bottom) / 2;
+  svg.transition().duration(dur).ease(d3.easeCubicInOut).call(zoom.transform, d3.zoomIdentity.translate(cx - k * (x0 + x1) / 2, cy - k * (y0 + y1) / 2).scale(k));
+}
+function goHome() { focusId = null; litId = null; refresh(); flyTo(h.descendants().filter(d => d.depth <= 3), 40); card(h); }
+function select(d) {
+  if (d.depth === 0) return goHome();
+  if (d.depth === 3) { litId = d.data.id; focusId = d.parent.data.id; refresh(); flyTo([d.parent, ...d.parent.children]); card(d); return; }
+  litId = null; focusId = d.data.id; refresh(); flyTo(d.descendants()); card(d);
+}
+function crumbs() {
+  const el = document.getElementById("crumbs");
+  if (!focusId && !litId) { el.innerHTML = ""; return; }
+  const d = byId.get(litId || focusId);
+  el.innerHTML = d.ancestors().reverse().map(a => `<button type="button" data-id="${a.data.id}">${esc(a.depth === 0 ? "Overview" : a.depth === 3 ? "§" + a.data.section : a.data.label)}</button>`).join(" › ");
+  el.querySelectorAll("button").forEach(b => b.onclick = () => select(byId.get(b.dataset.id)));
+}
+function statusBar(leaves) {
+  const c = {}; leaves.forEach(l => c[l.data.status] = (c[l.data.status] || 0) + 1);
+  return `<div class="bar">${STATUS.filter(s => c[s[0]]).map(s => `<span style="flex:${c[s[0]]};background:${colorOf(s[0])}" title="${esc(s[0])}: ${c[s[0]]}"></span>`).join("")}</div>
+    <div class="mini">${STATUS.filter(s => c[s[0]]).map(s => `${c[s[0]]} ${esc((SHORT[s[0]] || s[0]).toLowerCase())}`).join(" · ")}</div>`;
+}
+function list(items, kind) {
+  return `<ul class="list">${items.map(d => `<li><button type="button" data-id="${d.data.id}" style="${kind === "run" && !matches(d.data) ? "opacity:.4" : ""}">
+    <span class="dot" style="background:${kind === "run" ? colorOf(d.data.status) : hue(d)}"></span>
+    <span class="sec">${kind === "run" ? "§" + d.data.section : d.leaves().length}</span><span>${esc(kind === "run" ? d.data.short_title : d.data.label)}</span></button></li>`).join("")}</ul>`;
+}
+function card(d) {
+  const C = document.getElementById("card"), t = d.data;
+  if (d.depth === 0) {
+    C.innerHTML = `<div class="eyebrow">The central question</div><h2>${esc(CONFIG.question_long || CONFIG.question)}</h2>
+      <p>${esc(CONFIG.intro || "")}</p>
+      <p class="mini">Inner ring: ${DATA.goals.length} goals. Middle ring: approach groups. Outer ring: all ${DATA.runs.length} runs, coloured by status. Click anything to fly in, or take the tour.</p>
+      ${statusBar(d.leaves())}${list(d.children, "goal")}`;
+  } else if (d.depth === 1) {
+    C.innerHTML = `<div class="eyebrow" style="color:${hue(d)}">Goal · ${d.leaves().length} runs</div><h2>${esc(t.label)}</h2><p>${esc(t.question)}</p>
+      <div class="answer" style="border-color:${hue(d)}">${esc(t.answer)}</div>${statusBar(d.leaves())}${list(d.children, "group")}`;
+  } else if (d.depth === 2) {
+    C.innerHTML = `<div class="eyebrow" style="color:${hue(d)}">${esc(d.parent.data.label)}</div><h2>${esc(t.label)}</h2>${statusBar(d.leaves())}${list(d.children, "run")}`;
+  } else {
+    C.innerHTML = `<div class="eyebrow" style="color:${hue(d)}">${esc(d.parent.data.label)}</div>
+      <h2><span class="sec">§${t.section}</span> ${esc(t.short_title)}</h2><span class="pill" style="background:${colorOf(t.status)}">${esc(t.status)}</span>
+      <dl><dt>Result</dt><dd>${esc(t.key_result)}</dd><dt>Method</dt><dd>${esc(t.method)}</dd><dt>Unit</dt><dd>${esc(t.unit)}</dd>
+      <dt>Validation</dt><dd>${esc(t.validation)}</dd><dt>Data</dt><dd>${esc(t.data)}</dd></dl>
+      <button class="b primary" type="button" data-notes="${t.section}" style="width:100%;margin-top:8px">Open full notes and figures${(NOTES[t.section] || {}).figs && NOTES[t.section].figs.length ? " (" + NOTES[t.section].figs.length + ")" : ""} →</button>`;
+  }
+  C.querySelectorAll("button[data-id]").forEach(b => b.onclick = () => select(byId.get(b.dataset.id)));
+  C.querySelectorAll("button[data-notes]").forEach(b => b.onclick = () => openNotes(+b.dataset.notes));
+  C.scrollTop = 0;
+}
+// tooltip
+const tip = document.getElementById("tip");
+function showTip(e, d) {
+  if (matchMedia("(hover: none)").matches) return;
+  const t = d.data;
+  tip.innerHTML = d.depth === 3 ? `<b>§${t.section} ${esc(t.short_title)}</b>${esc(t.key_result)}` : d.depth === 0 ? "<b>Overview</b>Click to return here" :
+    `<b>${esc(t.label)}</b>${d.leaves().length} runs · click to fly in`;
+  tip.hidden = false; moveTip(e);
+}
+function moveTip(e) { const x = Math.min(e.clientX + 14, innerWidth - 320), y = Math.min(e.clientY + 14, innerHeight - 120); tip.style.left = x + "px"; tip.style.top = y + "px"; }
+function hideTip() { tip.hidden = true; }
+// tour
+const STOPS = ["root", ...GOAL_ORDER];
+let stop = -1;
+const tourEl = document.getElementById("tour");
+function goStop(i) {
+  stop = Math.max(0, Math.min(STOPS.length - 1, i));
+  document.getElementById("step").textContent = `${stop + 1} / ${STOPS.length}`;
+  document.getElementById("prev").disabled = stop === 0;
+  document.getElementById("next").textContent = stop === STOPS.length - 1 ? "Finish" : "Next →";
+  const d = byId.get(STOPS[stop]); d.depth === 0 ? goHome() : select(d);
+}
+document.getElementById("tourBtn").onclick = () => { tourEl.hidden = false; goStop(0); document.getElementById("next").focus(); };
+document.getElementById("prev").onclick = () => goStop(stop - 1);
+document.getElementById("next").onclick = () => { if (stop === STOPS.length - 1) { tourEl.hidden = true; goHome(); } else goStop(stop + 1); };
+document.getElementById("endTour").onclick = () => { tourEl.hidden = true; goHome(); };
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || !reader.hidden || !lb.hidden) return;
+  if (!tourEl.hidden && (e.key === "ArrowRight" || e.key === "ArrowDown")) { e.preventDefault(); goStop(stop + 1); }
+  if (!tourEl.hidden && (e.key === "ArrowLeft" || e.key === "ArrowUp")) { e.preventDefault(); goStop(stop - 1); }
+  if (e.key === "Escape") { tourEl.hidden = true; goHome(); }
+});
+document.getElementById("home").onclick = goHome;
+// chips and search
+const chipsEl = document.getElementById("chips"), counts = {};
+DATA.runs.forEach(r => counts[r.status] = (counts[r.status] || 0) + 1);
+STATUS.forEach(([s]) => {
+  if (!counts[s]) return;                       // statuses no run uses are not offered as filters
+  const c = document.createElement("button"); c.type = "button"; c.className = "chip"; c.setAttribute("aria-pressed", "true");
+  c.innerHTML = `<span class="dot" style="background:${colorOf(s)}"></span>${esc(SHORT[s] || s)} <span class="n">${counts[s] || 0}</span>`;
+  c.dataset.status = s;
+  c.onclick = () => {
+    if (active.size === STATUS.length) { active.clear(); active.add(s); }          // first click: show only this status
+    else if (active.has(s)) { active.delete(s); if (!active.size) STATUS.forEach(x => active.add(x[0])); }
+    else active.add(s);                                                             // later clicks add or remove
+    syncChips(); refresh();
+  };
+  chipsEl.appendChild(c);
+});
+const resetBtn = document.createElement("button");
+resetBtn.type = "button"; resetBtn.className = "chip reset"; resetBtn.textContent = "Show all"; resetBtn.hidden = true;
+resetBtn.onclick = () => { STATUS.forEach(x => active.add(x[0])); syncChips(); refresh(); };
+chipsEl.appendChild(resetBtn);
+function syncChips() {
+  const all = active.size === STATUS.length;
+  chipsEl.querySelectorAll(".chip[data-status]").forEach(c => {
+    c.setAttribute("aria-pressed", all || active.has(c.dataset.status));
+    c.classList.toggle("solo", !all && active.has(c.dataset.status));
+  });
+  resetBtn.hidden = all;
+}
+let qt;
+document.getElementById("q").addEventListener("input", e => { clearTimeout(qt); qt = setTimeout(() => {
+  query = e.target.value.trim().toLowerCase(); focusId = null; litId = null; refresh();
+  const hits = h.leaves().filter(l => query && matches(l.data));
+  if (hits.length) { flyTo(hits); card(hits.length === 1 ? hits[0] : h); } else goHome();
+}, 200); });
+addEventListener("resize", () => { const d = litId ? byId.get(litId) : focusId ? byId.get(focusId) : null; d ? select(d) : goHome(); });
+
+// ---------- reader: full notes, pipeline and figures for one run ----------
+const reader = document.getElementById("reader"), lb = document.getElementById("lightbox");
+let lbList = [], lbIdx = 0, lastFocus = null;
+const md = s => {
+  let html = marked.parse(s || "", {mangle: false, headerIds: false});
+  html = html.replace(/<table>/g, '<div class="tbl"><table>').replace(/<\/table>/g, "</table></div>");
+  return html.replace(/§\s?(\d{1,3})/g, (m, n) => NOTES[n] ? `<a class="sec-link" data-sec="${n}">§${n}</a>` : m);
+};
+const SECS = [["why", "Why we ran it"], ["how", "How it was done"], ["found", "What we found"], ["means", "What it means"], ["caveats", "Caveats"], ["next", "Next"]];
+const PIPE = [["input_data", "Data"], ["preprocessing", "Preprocessing"], ["inputs", "Inputs"], ["target", "Target"], ["model", "Model"], ["split", "Split"], ["evaluation", "Evaluation"]];
+function openNotes(sec) {
+  const n = NOTES[sec], d = byId.get("r" + sec);
+  if (!n || !d) return;
+  const r = d.data, sib = d.parent.children, i = sib.indexOf(d);
+  const intro = n.sections.intro ? n.sections.intro.split("\n").filter(l => !/^\*(Notebook|Code)/.test(l)).join("\n") : "";
+  const parts = [];
+  SECS.forEach(([k, label]) => {
+    let body = "";
+    const pl = n.plain || {};
+    if (k === "how" && pl.how) body += `<div class="plain"><div class="lab">In plain words</div><div class="md">${md(pl.how)}</div></div>${PIPE.some(([f]) => (n.pipeline || {})[f]) ? '<div class="subhead">Traced pipeline</div>' : ""}`;
+    if (k === "found" && pl.results) body += `<div class="plain"><div class="lab">Results explained</div><div class="md">${md(pl.results)}</div></div>${n.sections.found ? '<div class="subhead">From the catalogue</div>' : ""}`;
+    if (k === "how" && n.sections.how) { /* catalogue account follows the pipeline table */ }
+    if (k === "how") {
+      const p = n.pipeline;
+      if (PIPE.some(([f]) => p[f])) body += `<div class="pipe">${PIPE.filter(([f]) => p[f]).map(([f, lab], j) => `<div class="k"><span class="step">${j + 1}</span>${lab}</div><div>${esc(p[f])}</div>`).join("")}</div>`;
+    }
+    if (n.sections[k]) body += (k === "how" ? '<div class="subhead">From the catalogue</div>' : "") + `<div class="md">${md(n.sections[k])}</div>`;
+    if (k === "found") body += n.figs.length
+      ? `<div class="gallery">${n.figs.map((f, j) => `<figure class="fig" tabindex="0" data-fig="${j}"><img loading="lazy" src="${esc(f.src)}" alt="${esc(f.caption)}"><figcaption>${f.legend ? `<div class="leg">${md(f.legend)}</div>` : ""}<div class="src">${esc(f.caption)}</div></figcaption></figure>`).join("")}</div>`
+      : `<p class="empty">No figures were saved for this run. Its outputs: ${esc(n.pipeline.outputs || "see the catalogue entry")}.</p>`;
+    if (body) parts.push([k, label, body]);
+  });
+  const p = n.pipeline;
+  const files = `<div class="pipe">${[["scripts", "Scripts"], ["outputs", "Outputs"], ["notebook", "Notebook"], ["trace_confidence", "Traced"], ["leak_flag", "Leakage check"], ["notes", "Audit notes"]]
+    .filter(([f]) => p[f]).map(([f, lab]) => `<div class="k">${lab}</div><div>${esc(p[f])}</div>`).join("")}<div class="k">Catalogue</div><div>${esc(CONFIG.catalogue)} §${sec}</div></div>`;
+  parts.push(["files", "Code and files", files]);
+  reader.innerHTML = `<div class="rd-wrap">
+    <div class="rd-bar"><button class="b" type="button" id="rdClose">← Back to the map</button><span class="grow"></span><span ${sib.length < 2 ? "hidden" : ""} style="display:contents">
+      <button class="b" type="button" id="rdPrev" ${i === 0 ? "disabled" : ""}>← §${i > 0 ? sib[i - 1].data.section : ""}</button>
+      <span class="mini">${i + 1} of ${sib.length} in this group</span>
+      <button class="b" type="button" id="rdNext" ${i === sib.length - 1 ? "disabled" : ""}>§${i < sib.length - 1 ? sib[i + 1].data.section : ""} →</button></span></div>
+    <nav class="rd-toc" aria-label="Sections">${parts.map(([k, label]) => `<a href="#rd-${k}" data-k="${k}">${label}${k === "found" && n.figs.length ? ` · ${n.figs.length} fig` : ""}</a>`).join("")}</nav>
+    <article class="rd-main">
+      <header><div class="eyebrow" style="color:${hue(d)}">${esc(d.parent.parent.data.label)} › ${esc(d.parent.data.label)}</div>
+        <h1><span class="sec" style="font-size:.6em">§${sec}</span> ${esc(n.title)}</h1>
+        <span class="pill" style="background:${colorOf(r.status)}">${esc(r.status)}</span> <span class="mini">&nbsp;Unit: ${esc(r.unit)} · Data: ${esc(r.data)}</span>
+        <div class="rd-key">${esc(r.key_result)}</div>${intro ? `<div class="md">${md(intro)}</div>` : ""}</header>
+      ${parts.map(([k, label, body]) => `<section class="rd-sec" id="rd-${k}"><h2>${label}</h2>${body}</section>`).join("")}
+    </article></div>`;
+  if (reader.hidden) lastFocus = document.activeElement;
+  reader.hidden = false; reader.scrollTop = 0; hideTip();
+  document.getElementById("rdClose").onclick = closeNotes;
+  document.getElementById("rdPrev").onclick = () => i > 0 && openNotes(sib[i - 1].data.section);
+  document.getElementById("rdNext").onclick = () => i < sib.length - 1 && openNotes(sib[i + 1].data.section);
+  reader.querySelectorAll(".rd-toc a").forEach(a => a.onclick = e => { e.preventDefault(); document.getElementById("rd-" + a.dataset.k).scrollIntoView({behavior: reduce ? "auto" : "smooth"}); });
+  reader.querySelectorAll("a.sec-link").forEach(a => a.onclick = () => { const t = byId.get("r" + a.dataset.sec); if (t) { select(t); openNotes(+a.dataset.sec); } });
+  reader.querySelectorAll(".fig").forEach(f => { const go = () => openLb(n.figs, +f.dataset.fig); f.onclick = go; f.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } }; });
+  document.getElementById("rdClose").focus();
+  select(d);
+}
+function closeNotes() { reader.hidden = true; if (lastFocus && lastFocus.focus) lastFocus.focus(); }
+function openLb(list, i) { lbList = list; lbIdx = i; lb.hidden = false; showLb(); document.getElementById("lbClose").focus(); }
+function showLb() { const f = lbList[lbIdx]; const im = document.getElementById("lbImg"); im.src = f.src; im.alt = f.caption;
+  document.getElementById("lbCap").textContent = `${lbIdx + 1} / ${lbList.length} · ${f.caption}`;
+  document.getElementById("lbLeg").innerHTML = f.legend ? md(f.legend) : ""; }
+document.getElementById("lbPrev").onclick = () => { lbIdx = (lbIdx - 1 + lbList.length) % lbList.length; showLb(); };
+document.getElementById("lbNext").onclick = () => { lbIdx = (lbIdx + 1) % lbList.length; showLb(); };
+document.getElementById("lbClose").onclick = () => { lb.hidden = true; };
+lb.addEventListener("click", e => { if (e.target === lb || e.target.classList.contains("lb-imgwrap")) lb.hidden = true; });
+document.addEventListener("keydown", e => {
+  if (!lb.hidden) { if (e.key === "Escape") { lb.hidden = true; e.stopImmediatePropagation(); }
+    else if (e.key === "ArrowRight") document.getElementById("lbNext").click(); else if (e.key === "ArrowLeft") document.getElementById("lbPrev").click(); return; }
+  if (!reader.hidden && e.key === "Escape") { closeNotes(); e.stopImmediatePropagation(); }
+}, true);
+
+refresh(); card(h); flyTo(h.descendants(), 40, 0);
+</script>
