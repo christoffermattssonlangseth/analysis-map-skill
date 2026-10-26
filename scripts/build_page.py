@@ -2,7 +2,8 @@
 
 Inputs: data_dir/goals.json, data_dir/runs_table.csv, build_dir/notes.json (from build_notes.py), assets/template.html,
 optional data_dir/groups.json ({group: {"summary": markdown, "figs": ["figs/<hash>.jpg", ...]}}: an expandable summary
-with key figures on each approach-group card; figures must belong to that group's runs).
+with key figures on each approach-group card; figures must belong to that group's runs), optional
+data_dir/goal_summaries.json (same shape keyed by goal id: a short synthesis + headline figures on each goal card).
 Outputs in build_dir:
   map.html           the page body for publishing as a claude.ai Artifact (the publisher adds the document skeleton);
                      publish it with build_dir as `root` and the figures as `files`
@@ -50,28 +51,35 @@ def main():
     no_notes = [int(s) for s in runs.section if str(int(s)) not in notes]
     if no_notes:
         print(f"warning: runs in runs_table with no catalogue entry: {no_notes}")
-    groups = {}
-    gp = os.path.join(data, "groups.json")
-    if os.path.exists(gp):
-        src2fig = {f["src"]: (int(sec), f) for sec, v in notes.items() for f in v["figs"]}
-        for name, gv in json.load(open(gp)).items():
-            if name not in grouped:
-                sys.exit(f"groups.json names an unknown group: {name!r}")
-            secs = set(runs.loc[runs.group == name, "section"].astype(int))
+    src2fig = {f["src"]: (int(sec), f) for sec, v in notes.items() for f in v["figs"]}
+
+    def panels(fname, keys, secs_of):
+        """Read an optional summaries file ({key: {summary, figs}}) and resolve its figures from the notes."""
+        out, p = {}, os.path.join(data, fname)
+        if not os.path.exists(p):
+            return out
+        for key, gv in json.load(open(p)).items():
+            if key not in keys:
+                sys.exit(f"{fname} names an unknown key: {key!r}")
             figs = []
             for src in gv.get("figs", []):
                 if src not in src2fig:
-                    print(f"warning: groups.json figure not in the map (dropped or renamed?): {name}: {src}")
+                    print(f"warning: {fname} figure not in the map (dropped or renamed?): {key}: {src}")
                     continue
                 sec, f = src2fig[src]
-                if sec not in secs:
-                    print(f"warning: groups.json figure belongs to §{sec}, outside group {name!r}")
+                if sec not in secs_of(key):
+                    print(f"warning: {fname} figure belongs to §{sec}, outside {key!r}")
                 figs.append({"src": src, "section": sec, "caption": f"§{sec} · " + f.get("caption", ""),
                              "legend": f.get("legend", "")})
-            groups[name] = {"summary": gv["summary"], "figs": figs}
-        missing_g = sorted(grouped - set(groups))
-        if missing_g:
-            print(f"note: groups without a summary in groups.json: {missing_g}")
+            out[key] = {"summary": gv["summary"], "figs": figs}
+        if sorted(set(keys) - set(out)):
+            print(f"note: {fname} has no entry for: {sorted(set(keys) - set(out))}")
+        return out
+    sec_of_group = lambda name: set(runs.loc[runs.group == name, "section"].astype(int))
+    groups = panels("groups.json", grouped, sec_of_group)
+    goal_groups = {x["id"]: x["groups"] for x in goals}
+    goalsum = panels("goal_summaries.json", set(goal_groups),
+                     lambda gid: set().union(*(sec_of_group(n) for n in goal_groups[gid])))
     rows = [{k: (int(v) if k == "section" else str(v)) for k, v in r.items() if k in FIELDS} for r in runs.to_dict("records")]
     conf = {k: cfg.get(k) for k in ("project", "question", "question_long", "intro", "centre_label", "catalogue", "statuses") if cfg.get(k) is not None}
     esc = lambda o: json.dumps(o, ensure_ascii=False).replace("</", "<\\/")
@@ -80,6 +88,7 @@ def main():
              .replace("const DATA = __DATA__;", "const DATA = " + esc({"goals": goals, "runs": rows}) + ";")
              .replace("const NOTES = __NOTES__;", "const NOTES = " + esc(notes) + ";")
              .replace("const GROUPS = __GROUPS__;", "const GROUPS = " + esc(groups) + ";")
+             .replace("const GOALSUM = __GOALSUM__;", "const GOALSUM = " + esc(goalsum) + ";")
              .replace("const CONFIG = __CONFIG__;", "const CONFIG = " + esc(conf) + ";"))
     open(os.path.join(build, "map.html"), "w").write(page)
     js = page.split("<script>")[-1].split("</script>")[0]
@@ -109,7 +118,7 @@ def main():
     zname = cfg["project"].replace(" ", "-") + "-analysis-map"
     shutil.make_archive(os.path.join(build, zname), "zip", build, "standalone")
     print(f"page {len(page) // 1000} KB | {len(rows)} runs, {len(goals)} goals | {len(used)} figures in "
-          f"{-(-len(used) // 250)} publish batch(es) | {len(groups)} group summaries | zip {os.path.join(build, zname)}.zip")
+          f"{-(-len(used) // 250)} publish batch(es) | {len(goalsum)} goal + {len(groups)} group summaries | zip {os.path.join(build, zname)}.zip")
 
 
 if __name__ == "__main__":

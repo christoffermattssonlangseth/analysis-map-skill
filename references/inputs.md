@@ -88,3 +88,8 @@ One expandable "Summary and key figures" panel per approach group (the middle ri
 `{"<group name>": {"summary": "<90-150 words, markdown>", "figs": ["figs/<hash>.jpg", ...]}}`. Group names must match
 `goals.json`; figures are 2-4 keys already used by that group's runs (so nothing extra is uploaded), most important
 first. Thumbnails open in the lightbox with their run legend. Write it with the "Group summaries" brief.
+
+## goal_summaries.json (optional)
+The same panel one ring in: `{"<goal id>": {"summary": "<60-90 words>", "figs": [...]}}`, shown under the goal's
+answer as "Synthesis and headline figures". Highly synthesised: the verdict across the goal's groups, how much to trust
+it, what stays open. Figures (2-3) come from the goal's runs; reuse the groups' key figures.

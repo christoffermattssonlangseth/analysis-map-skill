@@ -202,6 +202,7 @@ svg.near .node.run text, .node.run.lit text, svg.focus .node.run.infocus text { 
 const DATA = __DATA__;
 const NOTES = __NOTES__;
 const GROUPS = __GROUPS__;   // optional per-group summary + key figures (groups.json)
+const GOALSUM = __GOALSUM__; // optional per-goal synthesis + headline figures (goal_summaries.json)
 const CONFIG = __CONFIG__;
 const STATUS = CONFIG.statuses || [["Supported", "--s-supported"], ["Partly supported", "--s-partly"], ["Not supported", "--s-not"],
   ["Method negative (simple baseline wins)", "--s-method"], ["Declared prediction failed", "--s-failed"], ["Correction/audit", "--s-audit"], ["Infrastructure", "--s-infra"]];
@@ -348,6 +349,14 @@ function list(items, kind) {
     <span class="dot" style="background:${kind === "run" ? colorOf(d.data.status) : hue(d)}"></span>
     <span class="sec">${kind === "run" ? "§" + d.data.section : d.leaves().length}</span><span>${esc(kind === "run" ? d.data.short_title : d.data.label)}</span></button></li>`).join("")}</ul>`;
 }
+// expandable summary panel with key-figure thumbnails, for goal and group cards
+function panel(G, title) {
+  if (!G) return "";
+  return `<details class="gsum"${G.open ? " open" : ""}><summary>${title}${G.figs.length ? ` (${G.figs.length})` : ""}</summary>
+    <div class="gtext">${md(G.summary)}</div>${G.figs.length ? `<div class="gthumbs">${G.figs.map((f, j) =>
+      `<button type="button" data-gfig="${j}" aria-label="Open figure from §${f.section}"><img loading="lazy" src="${esc(f.src)}" alt="${esc(f.caption)}"><span class="gcap">§${f.section}</span></button>`).join("")}</div>` : ""}</details>`;
+}
+function wirePanel(C, G) { if (G) C.querySelectorAll("button[data-gfig]").forEach(b => b.onclick = () => openLb(G.figs, +b.dataset.gfig)); }
 function card(d) {
   const C = document.getElementById("card"), t = d.data;
   if (d.depth === 0) {
@@ -357,14 +366,12 @@ function card(d) {
       ${statusBar(d.leaves())}${list(d.children, "goal")}`;
   } else if (d.depth === 1) {
     C.innerHTML = `<div class="eyebrow" style="color:${hue(d)}">Goal · ${d.leaves().length} runs</div><h2>${esc(t.label)}</h2><p>${esc(t.question)}</p>
-      <div class="answer" style="border-color:${hue(d)}">${esc(t.answer)}</div>${statusBar(d.leaves())}${list(d.children, "group")}`;
+      <div class="answer" style="border-color:${hue(d)}">${esc(t.answer)}</div>${panel(GOALSUM[t.id], "Synthesis and headline figures")}${statusBar(d.leaves())}${list(d.children, "group")}`;
+    wirePanel(C, GOALSUM[t.id]);
   } else if (d.depth === 2) {
     const G = GROUPS[t.label];
-    const gsum = G ? `<details class="gsum"${G.open ? " open" : ""}><summary>Summary and key figures${G.figs.length ? ` (${G.figs.length})` : ""}</summary>
-      <div class="gtext">${md(G.summary)}</div>${G.figs.length ? `<div class="gthumbs">${G.figs.map((f, j) =>
-        `<button type="button" data-gfig="${j}" aria-label="Open figure from §${f.section}"><img loading="lazy" src="${esc(f.src)}" alt="${esc(f.caption)}"><span class="gcap">§${f.section}</span></button>`).join("")}</div>` : ""}</details>` : "";
-    C.innerHTML = `<div class="eyebrow" style="color:${hue(d)}">${esc(d.parent.data.label)}</div><h2>${esc(t.label)}</h2>${statusBar(d.leaves())}${gsum}${list(d.children, "run")}`;
-    if (G) C.querySelectorAll("button[data-gfig]").forEach(b => b.onclick = () => openLb(G.figs, +b.dataset.gfig));
+    C.innerHTML = `<div class="eyebrow" style="color:${hue(d)}">${esc(d.parent.data.label)}</div><h2>${esc(t.label)}</h2>${statusBar(d.leaves())}${panel(G, "Summary and key figures")}${list(d.children, "run")}`;
+    wirePanel(C, G);
   } else {
     C.innerHTML = `<div class="eyebrow" style="color:${hue(d)}">${esc(d.parent.data.label)}</div>
       <h2><span class="sec">§${t.section}</span> ${esc(t.short_title)}</h2><span class="pill" style="background:${colorOf(t.status)}">${esc(t.status)}</span>
