@@ -57,6 +57,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--coral); out
 .gsum > summary:focus-visible { outline: 2px solid var(--plum); outline-offset: 2px; border-radius: 10px; }
 .gsum .gtext { padding: 0 12px; line-height: 1.5; color: #e3d9e5; }
 .gsum .gtext p { margin: 4px 0 8px; }
+.card:has(.gsum[open]) { width: 500px; max-height: min(80vh, 820px); }
 .gthumbs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 4px 12px 12px; }
 .gthumbs button { all: unset; box-sizing: border-box; cursor: zoom-in; background: #fff; border-radius: 6px; overflow: hidden; display: grid; }
 .gthumbs button:focus-visible { outline: 2px solid var(--plum); outline-offset: 2px; }
