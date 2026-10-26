@@ -21,7 +21,8 @@ run catalogue (markdown) ──┐
 pipeline registry (opt.) ──┤                       ┌─> notes.json ─┐
 notebooks + figure files ──┼─> build_notes.py ─────┤               ├─> build_page.py ─> map.html (Artifact)
 data folder:               │                       └─> todo lists  │                    standalone/ + zip
-  runs_table.csv, goals.json, plain_language.json, legends.json, fig_fixes.json ─────────┘
+  runs_table.csv, goals.json, plain_language.json, legends.json, fig_fixes.json,
+  groups.json (optional group summaries) ──────────────────────────────────────────────┘
 ```
 
 ### 0. Set up the project config
@@ -68,6 +69,8 @@ attaches registry rows, plain notes and legends, applies `fig_fixes.json`, drops
 - Merge the outputs into `plain_language.json` / `legends.json` in the data folder (keys: run number as a string;
   figure path `figs/<hash>.jpg`). Re-run step 4 until both to-do lists are empty.
 Spot-check a few results against the catalogue before trusting a batch.
+- Optional: group summary cards (`groups.json`, "Group summaries" brief): an expandable summary with 2-4 key figures on
+  each approach-group card. Refresh a group's entry when its runs change.
 
 ### 6. Build the page and look at it
 ```

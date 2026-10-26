@@ -60,3 +60,11 @@ import json; m = json.load(open("todo_legends.json")); keys = sorted(m, key=lamb
 n = 5; size = -(-len(keys) // n)
 for i in range(n): json.dump({k: m[k] for k in keys[i*size:(i+1)*size]}, open(f"todo_legends_part{i+1}.json", "w"))
 ```
+
+## Group summaries
+> Write summary cards for approach groups <names>. Input: a JSON per group with its runs (section, title, status,
+> key_result, plain results, figures with src + legend); images at <build_dir>/<src>; the catalogue for corrections.
+> Per group: "summary" 90-150 plain words (what the runs asked, the 2-3 main numbers and what they mean, what failed
+> or was corrected, how confident; name runs as §N; at most 2 bold phrases; no invented numbers) and "figs": 2-4 src
+> values from the group's runs that best show its findings, from different runs where possible. Open every chosen
+> image and confirm it is readable and shows the claim. Output {"<group>": {"summary": ..., "figs": [...]}}; validate.

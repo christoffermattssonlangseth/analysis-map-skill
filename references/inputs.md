@@ -82,3 +82,9 @@ hash of the source image bytes, so legends survive rebuilds as long as the image
 
 ## fig_fixes.json
 `{"move": {"figs/<hash>.jpg": [from_run, to_run]}, "drop": ["figs/<hash>.jpg"]}`
+
+## groups.json (optional)
+One expandable "Summary and key figures" panel per approach group (the middle ring), shown on the group's card:
+`{"<group name>": {"summary": "<90-150 words, markdown>", "figs": ["figs/<hash>.jpg", ...]}}`. Group names must match
+`goals.json`; figures are 2-4 keys already used by that group's runs (so nothing extra is uploaded), most important
+first. Thumbnails open in the lightbox with their run legend. Write it with the "Group summaries" brief.
