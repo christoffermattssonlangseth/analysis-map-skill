@@ -80,7 +80,8 @@ def main():
     goal_groups = {x["id"]: x["groups"] for x in goals}
     goalsum = panels("goal_summaries.json", set(goal_groups),
                      lambda gid: set().union(*(sec_of_group(n) for n in goal_groups[gid])))
-    rows = [{k: (int(v) if k == "section" else str(v)) for k, v in r.items() if k in FIELDS} for r in runs.to_dict("records")]
+    # `date` (YYYY-MM-DD) is optional; when present the page offers a "By date" view grouped by week and day
+    rows = [{k: (int(v) if k == "section" else str(v)) for k, v in r.items() if k in FIELDS or k == "date"} for r in runs.to_dict("records")]
     conf = {k: cfg.get(k) for k in ("project", "question", "question_long", "intro", "centre_label", "catalogue", "statuses") if cfg.get(k) is not None}
     esc = lambda o: json.dumps(o, ensure_ascii=False).replace("</", "<\\/")
     t = open(os.path.join(HERE, "..", "assets", "template.html")).read()

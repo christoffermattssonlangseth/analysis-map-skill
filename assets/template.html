@@ -178,6 +178,7 @@ svg.near .node.run text, .node.run.lit text, svg.focus .node.run.infocus text { 
     <input id="q" type="search" aria-label="Search runs" placeholder="Search runs, methods, results…" autocomplete="off">
     <button class="b primary" id="tourBtn" type="button">Take the tour</button>
     <button class="b" id="home" type="button">Overview</button>
+<button class="b" id="viewBtn" type="button" aria-label="Switch between grouping by goal and by date">By date</button>
     <div class="chips" id="chips" role="group" aria-label="Filter by status"></div>
   </div>
 </div>
@@ -210,11 +211,44 @@ const SHORT = {"Method negative (simple baseline wins)": "Simple baseline wins"}
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const colorOf = s => { const c = (STATUS.find(x => x[0] === s) || [0, "--s-infra"])[1]; return c.startsWith("#") ? c : css(c); };
 // goals are drawn clockwise in the order goals.json lists them; colours cycle through a palette tuned for the dark sky
-const GOAL_ORDER = DATA.goals.map(g => g.id);
+// two views: by goal (goal -> approach group -> run) or by date (week -> day -> run); ?view=time selects the second
+const VIEW = (() => {
+  const q = new URLSearchParams(location.search).get("view");
+  if (q) return q === "time" ? "time" : "goal";
+  try { return localStorage.getItem("amap-view") === "time" ? "time" : "goal"; } catch (e) { return "goal"; }
+})();
 const PALETTE = ["#e7a9cf", "#f08a78", "#f2c46d", "#8fd3b6", "#7fb7e8", "#b39ddb", "#e8a56b", "#9fc5c0", "#d8a0e0", "#a8d47f", "#f0b8a0", "#88c8e8"];
-const HUES = Object.fromEntries(GOAL_ORDER.map((g, i) => [g, DATA.goals[i].color || PALETTE[i % PALETTE.length]]));
+// periods for the time view: weeks from the runs' optional `date` column, or blocks of 25 sections when dates are missing
+function timePeriods() {
+  const ok = r => r.date && r.date !== "nan" && /^\d{4}-\d{2}-\d{2}$/.test(r.date);
+  const day = s => new Date(s + "T12:00:00");
+  const fmt = (s, o) => day(s).toLocaleDateString("en-GB", o);
+  const monday = s => { const d = day(s); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return d.toISOString().slice(0, 10); };
+  const useDates = DATA.runs.filter(ok).length >= 0.8 * DATA.runs.length;
+  const P = new Map();
+  [...DATA.runs].sort((a, b) => a.section - b.section).forEach(r => {
+    let pk, pl, dk, dl;
+    if (useDates && ok(r)) { pk = monday(r.date); pl = "Week of " + fmt(pk, {day: "numeric", month: "short", year: "numeric"});
+      dk = r.date; dl = fmt(r.date, {weekday: "short", day: "numeric", month: "short"}); }
+    else if (useDates) { pk = "undated"; pl = "Undated"; dk = "undated"; dl = "Undated"; }
+    else { const b = Math.floor((r.section - 1) / 25); pk = "b" + b; pl = `§${b * 25 + 1}–§${b * 25 + 25}`;
+      const c = Math.floor((r.section - 1) / 5); dk = "c" + c; dl = `§${c * 5 + 1}–§${c * 5 + 5}`; }
+    if (!P.has(pk)) P.set(pk, {label: pl, days: new Map()});
+    const D = P.get(pk).days; if (!D.has(dk)) D.set(dk, {label: dl, runs: []}); D.get(dk).runs.push(r);
+  });
+  return [...P.entries()].sort((a, b) => a[0] < b[0] ? -1 : 1).map(([k, p], i) => {
+    const runs = [...p.days.values()].flatMap(d => d.runs), secs = runs.map(r => r.section);
+    return {id: "p" + i, label: p.label, days: [...p.days.values()],
+      question: useDates ? "Runs dated to this week (date of each run's first committed code, kept in section order; approximate)."
+                         : "Runs in this block of sections (sections are numbered in the order they were run).",
+      answer: `§${Math.min(...secs)}–§${Math.max(...secs)} · ${runs.length} runs`, groups: [...p.days.values()].map(d => d.label)};
+  });
+}
+let GOAL_ORDER, HUES, PERIODS = null;
+if (VIEW === "time") { PERIODS = timePeriods(); GOAL_ORDER = PERIODS.map(p => p.id); HUES = Object.fromEntries(PERIODS.map((p, i) => [p.id, PALETTE[i % PALETTE.length]])); }
+else { GOAL_ORDER = DATA.goals.map(g => g.id); HUES = Object.fromEntries(GOAL_ORDER.map((g, i) => [g, DATA.goals[i].color || PALETTE[i % PALETTE.length]])); }
 document.getElementById("mapTitle").textContent = CONFIG.question;
-document.getElementById("mapSub").textContent = `${CONFIG.project} · ${DATA.runs.length} runs · ${DATA.goals.length} goals · double-click a run for its full notes`;
+document.getElementById("mapSub").textContent = `${CONFIG.project} · ${DATA.runs.length} runs · ${VIEW === "time" ? PERIODS.length + " periods, in date order" : DATA.goals.length + " goals"} · double-click a run for its full notes`;
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
 const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const active = new Set(STATUS.map(s => s[0]));
@@ -222,11 +256,15 @@ let query = "", focusId = null, litId = null;
 
 // hierarchy
 const goalsById = Object.fromEntries(DATA.goals.map(g => [g.id, g]));
-const tree = {id: "root", type: "root", label: CONFIG.question, children: GOAL_ORDER.map(gid => {
-  const g = goalsById[gid];
-  return {...g, type: "goal", children: g.groups.map((name, i) => ({id: gid + "-" + i, type: "group", label: name, goalId: gid,
-    children: DATA.runs.filter(r => r.group === name).map(r => ({...r, id: "r" + r.section, type: "run", goalId: gid, label: `§${r.section} ${r.short_title}`}))}))};
-})};
+const runNode = (r, gid) => ({...r, id: "r" + r.section, type: "run", goalId: gid, label: `§${r.section} ${r.short_title}`});
+const tree = VIEW === "time"
+  ? {id: "root", type: "root", label: CONFIG.question, children: PERIODS.map(p => ({...p, type: "goal",
+      children: p.days.map((d, i) => ({id: p.id + "-" + i, type: "group", label: d.label, goalId: p.id, children: d.runs.map(r => runNode(r, p.id))}))}))}
+  : {id: "root", type: "root", label: CONFIG.question, children: GOAL_ORDER.map(gid => {
+      const g = goalsById[gid];
+      return {...g, type: "goal", children: g.groups.map((name, i) => ({id: gid + "-" + i, type: "group", label: name, goalId: gid,
+        children: DATA.runs.filter(r => r.group === name).map(r => runNode(r, gid))}))};
+    })};
 const R = 480, RING = {0: 0, 1: 0.32 * R, 2: 0.64 * R, 3: R};
 const h = d3.hierarchy(tree);
 // sectors: each goal gets an angle proportional to its run count, with a floor so small goals keep room
@@ -362,10 +400,10 @@ function card(d) {
   if (d.depth === 0) {
     C.innerHTML = `<div class="eyebrow">The central question</div><h2>${esc(CONFIG.question_long || CONFIG.question)}</h2>
       <p>${esc(CONFIG.intro || "")}</p>
-      <p class="mini">Inner ring: ${DATA.goals.length} goals. Middle ring: approach groups. Outer ring: all ${DATA.runs.length} runs, coloured by status. Click anything to fly in, or take the tour.</p>
+      <p class="mini">${VIEW === "time" ? `Inner ring: ${PERIODS.length} periods in date order. Middle ring: days. Outer ring: all ${DATA.runs.length} runs, coloured by status.` : `Inner ring: ${DATA.goals.length} goals. Middle ring: approach groups. Outer ring: all ${DATA.runs.length} runs, coloured by status.`} Click anything to fly in, or take the tour. Switch views with the “${VIEW === "time" ? "By goal" : "By date"}” button.</p>
       ${statusBar(d.leaves())}${list(d.children, "goal")}`;
   } else if (d.depth === 1) {
-    C.innerHTML = `<div class="eyebrow" style="color:${hue(d)}">Goal · ${d.leaves().length} runs</div><h2>${esc(t.label)}</h2><p>${esc(t.question)}</p>
+    C.innerHTML = `<div class="eyebrow" style="color:${hue(d)}">${VIEW === "time" ? "Period" : "Goal"} · ${d.leaves().length} runs</div><h2>${esc(t.label)}</h2><p>${esc(t.question)}</p>
       <div class="answer" style="border-color:${hue(d)}">${esc(t.answer)}</div>${panel(GOALSUM[t.id], "Synthesis and headline figures")}${statusBar(d.leaves())}${list(d.children, "group")}`;
     wirePanel(C, GOALSUM[t.id]);
   } else if (d.depth === 2) {
@@ -416,6 +454,16 @@ document.addEventListener("keydown", e => {
   if (e.key === "Escape") { tourEl.hidden = true; goHome(); }
 });
 document.getElementById("home").onclick = goHome;
+const viewBtn = document.getElementById("viewBtn");
+viewBtn.textContent = VIEW === "time" ? "By goal" : "By date";
+viewBtn.onclick = () => {
+  const next = VIEW === "time" ? "goal" : "time";
+  let stored = false;
+  try { localStorage.setItem("amap-view", next); stored = true; } catch (e) { /* storage blocked: fall back to the URL */ }
+  if (stored && !new URLSearchParams(location.search).get("view")) { location.reload(); return; }
+  const u = new URL(location.href); next === "time" ? u.searchParams.set("view", "time") : u.searchParams.set("view", "goal");
+  location.href = u.toString();
+};
 // chips and search
 const chipsEl = document.getElementById("chips"), counts = {};
 DATA.runs.forEach(r => counts[r.status] = (counts[r.status] || 0) + 1);
@@ -484,7 +532,10 @@ function openNotes(sec) {
       : `<p class="empty">No figures were saved for this run. Its outputs: ${esc(n.pipeline.outputs || "see the catalogue entry")}.</p>`;
     if (body) parts.push([k, label, body]);
   });
-  const p = n.pipeline;
+  // the catalogue header line (*Notebook:* … · *Code:* …) names the run's notebook(s); prefer it over the registry column
+  const hdrLine = (n.sections.intro || "").split("\n").filter(l => /^\*(Notebook|Code)/.test(l)).join(" ");
+  const catNb = [...new Set((hdrLine.match(/`[^`]+\.ipynb`/g) || []).map(s => s.slice(1, -1)))].join(", ");
+  const p = Object.assign({}, n.pipeline, catNb ? {notebook: catNb} : (/^none/i.test(n.pipeline.notebook || "") ? {notebook: ""} : {}));
   const files = `<div class="pipe">${[["scripts", "Scripts"], ["outputs", "Outputs"], ["notebook", "Notebook"], ["trace_confidence", "Traced"], ["leak_flag", "Leakage check"], ["notes", "Audit notes"]]
     .filter(([f]) => p[f]).map(([f, lab]) => `<div class="k">${lab}</div><div>${esc(p[f])}</div>`).join("")}<div class="k">Catalogue</div><div>${esc(CONFIG.catalogue)} §${sec}</div></div>`;
   parts.push(["files", "Code and files", files]);

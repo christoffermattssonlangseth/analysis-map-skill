@@ -93,3 +93,11 @@ first. Thumbnails open in the lightbox with their run legend. Write it with the 
 The same panel one ring in: `{"<goal id>": {"summary": "<60-90 words>", "figs": [...]}}`, shown under the goal's
 answer as "Synthesis and headline figures". Highly synthesised: the verdict across the goal's groups, how much to trust
 it, what stays open. Figures (2-3) come from the goal's runs; reuse the groups' key figures.
+
+
+## Optional `date` column (timeline view)
+
+`runs_table.csv` may carry a `date` column (YYYY-MM-DD). When at least 80% of runs have one, the page offers a
+"By date" button that regroups the map as week → day → run (otherwise blocks of 25 sections). The choice is kept in
+browser storage (or `?view=time`). Dates can be approximate, e.g. the first commit of each run's code smoothed to
+be monotone in section order (isotonic regression).
